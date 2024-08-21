@@ -22,15 +22,6 @@ pub trait EnforcedClassicWrapperInterfaceTrait {
     // stellar classic.
     fn set_authorized(e: Env, id: Address, authorize: bool);
 
-    // --------------------------------------------------------------------------------
-    // Asset interface
-    // --------------------------------------------------------------------------------
-    //
-    // All the functions here have to be authorized by the asset spender
-    // (usually named `from` here) using all the input arguments, i.e. they have
-    // to call `from.require_auth()`.
-
-    fn transfer(e: Env, from: Address, to: Address, amount: i128);
 
     // --------------------------------------------------------------------------------
     // Read-only

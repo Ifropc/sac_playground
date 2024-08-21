@@ -15,6 +15,6 @@ soroban-token-sdk= { workspace = true }
 standard-traits = {path = "../standard-traits"}
 
 
-[dev_dependencies]
+[dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-token-sdk= { workspace = true }

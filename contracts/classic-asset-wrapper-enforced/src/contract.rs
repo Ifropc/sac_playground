@@ -7,7 +7,7 @@ use crate::validations::{
     is_admin_validation, is_contract_initialized_validation,
     is_contract_not_initialized_validation, is_wrapper_active_validation,
 };
-use soroban_sdk::{contract, contractimpl, token, vec, Address, Env};
+use soroban_sdk::{contract, contractimpl, token, vec, Address, Env, String};
 use standard_traits::classic_wrapper::common::{
     read_admin, read_asset, read_metadata, write_admin, write_is_active, write_metadata,
     WrapperMetadata,
@@ -77,6 +77,40 @@ impl EnforcedClassicWrapperInterfaceTrait for WrapperInterface {
     }
 
     // --------------------------------------------------------------------------------
+    // Read-only
+    // --------------------------------------------------------------------------------
+    fn get_metadata(e: Env) -> WrapperMetadata {
+        is_contract_initialized_validation(&e);
+        read_metadata(&e)
+    }
+
+    fn is_wrapper_active(e: Env) -> bool {
+        is_contract_initialized_validation(&e);
+        let metadata = read_metadata(&e);
+        metadata.is_active
+    }
+
+    fn get_admin(e: Env) -> Address {
+        read_admin(&e)
+    }
+}
+
+impl token::Interface for WrapperInterface {
+    fn allowance(env: Env, from: Address, spender: Address) -> i128 {
+        todo!()
+    }
+
+    fn approve(env: Env, from: Address, spender: Address, amount: i128, expiration_ledger: u32) {
+        todo!()
+    }
+
+    fn balance(e: Env, id: Address) -> i128 {
+        let asset_address = read_asset(&e);
+        let asset_client = token::Client::new(&e, &asset_address);
+        asset_client.balance(&id)
+    }
+
+    // --------------------------------------------------------------------------------
     // Asset Functions
     // --------------------------------------------------------------------------------
     //
@@ -100,22 +134,34 @@ impl EnforcedClassicWrapperInterfaceTrait for WrapperInterface {
         execute_with_temporary_authorizations(&e, addresses, action);
     }
 
-    // --------------------------------------------------------------------------------
-    // Read-only
-    // --------------------------------------------------------------------------------
-    fn get_metadata(e: Env) -> WrapperMetadata {
-        is_contract_initialized_validation(&e);
-        read_metadata(&e)
+    fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
+        todo!()
     }
 
-    fn is_wrapper_active(e: Env) -> bool {
-        is_contract_initialized_validation(&e);
-        let metadata = read_metadata(&e);
-        metadata.is_active
+    fn burn(env: Env, from: Address, amount: i128) {
+        todo!()
     }
 
-    fn get_admin(e: Env) -> Address {
-        read_admin(&e)
+    fn burn_from(env: Env, spender: Address, from: Address, amount: i128) {
+        todo!()
+    }
+
+    fn decimals(e: Env) -> u32 {
+        let asset_address = read_asset(&e);
+        let asset_client = token::Client::new(&e, &asset_address);
+        asset_client.decimals()
+    }
+
+    fn name(e: Env) -> String {
+        let asset_address = read_asset(&e);
+        let asset_client = token::Client::new(&e, &asset_address);
+        asset_client.name()
+    }
+
+    fn symbol(e: Env) -> String {
+        let asset_address = read_asset(&e);
+        let asset_client = token::Client::new(&e, &asset_address);
+        asset_client.symbol()
     }
 }
 
