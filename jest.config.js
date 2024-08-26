@@ -4,5 +4,5 @@ export default {
   transform: {
     "^.+.tsx?$": ["ts-jest", {}],
   },
-  testTimeout: 1000 * 60,
+  testTimeout: 1000 * 60 * 5,
 };

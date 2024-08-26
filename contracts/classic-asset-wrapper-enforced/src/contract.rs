@@ -7,7 +7,8 @@ use crate::validations::{
     is_admin_validation, is_contract_initialized_validation,
     is_contract_not_initialized_validation, is_wrapper_active_validation,
 };
-use soroban_sdk::{contract, contractimpl, token, vec, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, token, vec, Address, Env, String, IntoVal, Symbol};
+use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
 use standard_traits::classic_wrapper::common::{
     read_admin, read_asset, read_metadata, write_admin, write_is_active, write_metadata,
     WrapperMetadata,
