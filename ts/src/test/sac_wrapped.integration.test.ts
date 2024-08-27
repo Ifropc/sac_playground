@@ -421,6 +421,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     beforeEach(() => {
       expect(wrappedTokenClient).toBeDefined();
       expect(testContext).toBeDefined();
+      expect(testContext!.state).toBe(TestState.controller_initialized)
     });
 
     it("Can get the name", async () => {
@@ -436,7 +437,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       let mintTx = await wrappedTokenClient!.mint(
           {
             to: alice.publicKey(),
-            amount: BigInt(12),
+            amount: BigInt(12345),
           },
           { fee: 100000000 },
       );
@@ -474,7 +475,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       let newBalance = (await tx.simulate()).result;
 
-      expect(newBalance).toBe(balance + BigInt(12));
+      expect(newBalance).toBe(balance + BigInt(12345));
       let aliceAccount = await horizon
           .accounts()
           .accountId(alice.publicKey())
@@ -488,6 +489,59 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           )?.balance;
       expect(classicBalance).toBeDefined()
       expect(parseFloat(classicBalance!)).toBe((Number(newBalance) / 10000000));
+    });
+
+    it("Can transfer Alice -> Bob", async () => {
+      let balanceTx = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+      let balance = (await balanceTx.simulate()).result;
+      let balanceTxBob = await wrappedTokenClient!.balance({ id: bob.publicKey() });
+      let balanceBob = (await balanceTxBob.simulate()).result;
+
+      let transferTx = await wrappedTokenClient!.transfer(
+          {
+            from: alice.publicKey(),
+            to: bob.publicKey(),
+            amount: BigInt(3),
+          },
+          { fee: 100000000 },
+      );
+      console.log(transferTx.needsNonInvokerSigningBy());
+      console.log(transferTx.toXDR());
+
+      await transferTx.signAuthEntries({
+        publicKey: alice.publicKey(),
+        signAuthEntry: signer(alice).signAuthEntry,
+      });
+      console.log(transferTx.needsNonInvokerSigningBy());
+
+      // TODO: ???
+      transferTx.raw = TransactionBuilder.cloneFrom(transferTx.built!, {
+        fee: transferTx.built!.fee,
+        sorobanData: new SorobanDataBuilder(
+            balanceTx.simulationData.transactionData.toXDR(),
+        )
+            .setResourceFee(BigInt(10000000))
+            .build(),
+      });
+      await transferTx.simulate();
+      await transferTx.sign({
+        signTransaction: signer(submitter).signTransaction,
+      });
+      console.log(transferTx.toXDR());
+
+      let result = await transferTx.send();
+      let hash = result.sendTransactionResponse?.hash;
+      console.log("Transfer transaction hash: " + hash);
+      expect(hash).toBeDefined();
+      expect(result.getTransactionResponse?.status).toBe(
+          rpc.Api.GetTransactionStatus.SUCCESS,
+      );
+
+      let newBalance = (await balanceTx.simulate()).result;
+      let newBalanceBob = (await balanceTxBob.simulate()).result;
+
+      expect(newBalance).toBe(balance - BigInt(3));
+      expect(newBalanceBob).toBe(balanceBob + BigInt(3));
     });
   });
 });
