@@ -412,7 +412,82 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
             (x as BalanceLineAsset).asset_code ==
             testContext!.asset.split(":")[0],
         )?.balance;
-      expect(classicBalance).toBe((Number(newBalance) / 10000000).toString());
+      expect(classicBalance).toBeDefined()
+      expect(parseFloat(classicBalance!)).toBe((Number(newBalance) / 10000000));
+    });
+  });
+
+  describe("Wrapped SAC test", () => {
+    beforeEach(() => {
+      expect(wrappedTokenClient).toBeDefined();
+      expect(testContext).toBeDefined();
+    });
+
+    it("Can get the name", async () => {
+      let tx = await wrappedTokenClient!.name();
+      let res = await tx.simulate();
+      expect(res.result).toBe(testContext!.asset_wrapped);
+    });
+
+    it("Can mint", async () => {
+      let tx = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+      let balance = (await tx.simulate()).result;
+
+      let mintTx = await wrappedTokenClient!.mint(
+          {
+            to: alice.publicKey(),
+            amount: BigInt(12),
+          },
+          { fee: 100000000 },
+      );
+      console.log(mintTx.needsNonInvokerSigningBy());
+      console.log(mintTx.toXDR());
+
+      await mintTx.signAuthEntries({
+        publicKey: admin.publicKey(),
+        signAuthEntry: signer(admin).signAuthEntry,
+      });
+      console.log(mintTx.needsNonInvokerSigningBy());
+
+      // TODO: ???
+      mintTx.raw = TransactionBuilder.cloneFrom(mintTx.built!, {
+        fee: mintTx.built!.fee,
+        sorobanData: new SorobanDataBuilder(
+            tx.simulationData.transactionData.toXDR(),
+        )
+            .setResourceFee(BigInt(10000000))
+            .build(),
+      });
+      await mintTx.simulate();
+      await mintTx.sign({
+        signTransaction: signer(submitter).signTransaction,
+      });
+      console.log(mintTx.toXDR());
+
+      let result = await mintTx.send();
+      let hash = result.sendTransactionResponse?.hash;
+      console.log("Mint transaction hash: " + hash);
+      expect(hash).toBeDefined();
+      expect(result.getTransactionResponse?.status).toBe(
+          rpc.Api.GetTransactionStatus.SUCCESS,
+      );
+
+      let newBalance = (await tx.simulate()).result;
+
+      expect(newBalance).toBe(balance + BigInt(12));
+      let aliceAccount = await horizon
+          .accounts()
+          .accountId(alice.publicKey())
+          .call();
+      let classicBalance = aliceAccount.balances
+          .filter((x) => x.asset_type == "credit_alphanum12")
+          .find(
+              (x) =>
+                  (x as BalanceLineAsset).asset_code ==
+                  testContext!.asset_wrapped.split(":")[0],
+          )?.balance;
+      expect(classicBalance).toBeDefined()
+      expect(parseFloat(classicBalance!)).toBe((Number(newBalance) / 10000000));
     });
   });
 });

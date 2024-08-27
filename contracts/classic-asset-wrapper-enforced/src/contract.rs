@@ -9,6 +9,7 @@ use crate::validations::{
 };
 use soroban_sdk::{contract, contractimpl, token, vec, Address, Env, String, IntoVal, Symbol};
 use soroban_sdk::auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation};
+use soroban_sdk::token::TokenInterface;
 use standard_traits::classic_wrapper::common::{
     read_admin, read_asset, read_metadata, write_admin, write_is_active, write_metadata,
     WrapperMetadata,
@@ -96,7 +97,8 @@ impl EnforcedClassicWrapperInterfaceTrait for WrapperInterface {
     }
 }
 
-impl token::Interface for WrapperInterface {
+#[contractimpl]
+impl TokenInterface for WrapperInterface {
     fn allowance(env: Env, from: Address, spender: Address) -> i128 {
         todo!()
     }
