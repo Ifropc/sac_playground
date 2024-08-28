@@ -17,6 +17,7 @@ import { TokenClient } from "../bindings/token";
 import { WrappedClient } from "../bindings/wrapped_client";
 import { TokenControllerClient } from "../bindings/controller";
 import BalanceLineAsset = Horizon.HorizonApi.BalanceLineAsset;
+import {SwapClient} from "../bindings/swap";
 
 export * as rpc from "@stellar/stellar-sdk/rpc";
 const util = require("node:util");
@@ -54,6 +55,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
   let underlyingSACTokenClient: TokenClient | null;
   let wrappedFunctionClient: WrappedClient | null;
   let controllerClient: TokenControllerClient | null;
+  let swapClient: SwapClient | null
   let testContext: TestContext | null;
 
   beforeAll(() => {
@@ -92,6 +94,12 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         networkPassphrase: network,
         rpcUrl: rpcUrl,
         contractId: testContext.controller,
+      });
+      swapClient = new SwapClient({
+        publicKey: submitter.publicKey(),
+        networkPassphrase: network,
+        rpcUrl: rpcUrl,
+        contractId: testContext.swap_contract,
       });
     }
   });
@@ -208,6 +216,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       let wrapper = await deploy_contract("enforced_classic_asset_wrapper");
       let controller = await deploy_contract("regulated_token_controller");
+      let swap = await deploy_contract("swap");
 
       writeContext({
         asset: sac.ticker + ":" + issuer.publicKey(),
@@ -216,6 +225,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         sac_wrapped: sac_wrapped.contract,
         wrapper: wrapper,
         controller: controller,
+        swap_contract: swap,
         state: TestState.deployed,
       });
     });
@@ -543,6 +553,60 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       expect(newBalance).toBe(balance - BigInt(3));
       expect(newBalanceBob).toBe(balanceBob + BigInt(3));
     });
+
+    it ("Can delegate transfer", async () => {
+      let balanceTx = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+      let balance = (await balanceTx.simulate()).result;
+      let balanceTxBob = await wrappedTokenClient!.balance({ id: bob.publicKey() });
+      let balanceBob = (await balanceTxBob.simulate()).result;
+
+      let transferTx = await swapClient!.delegate_transfer(
+          {
+            asset: testContext!.wrapper,
+            from: alice.publicKey(),
+            to: bob.publicKey(),
+            amount: BigInt(2),
+          },
+          { fee: 100000000 },
+      );
+      console.log(transferTx.needsNonInvokerSigningBy());
+      console.log(transferTx.toXDR());
+
+      await transferTx.signAuthEntries({
+        publicKey: alice.publicKey(),
+        signAuthEntry: signer(alice).signAuthEntry,
+      });
+      console.log(transferTx.needsNonInvokerSigningBy());
+
+      // TODO: ???
+      transferTx.raw = TransactionBuilder.cloneFrom(transferTx.built!, {
+        fee: transferTx.built!.fee,
+        sorobanData: new SorobanDataBuilder(
+            balanceTx.simulationData.transactionData.toXDR(),
+        )
+            .setResourceFee(BigInt(10000000))
+            .build(),
+      });
+      await transferTx.simulate();
+      await transferTx.sign({
+        signTransaction: signer(submitter).signTransaction,
+      });
+      console.log(transferTx.toXDR());
+
+      let result = await transferTx.send();
+      let hash = result.sendTransactionResponse?.hash;
+      console.log("Transfer transaction hash: " + hash);
+      expect(hash).toBeDefined();
+      expect(result.getTransactionResponse?.status).toBe(
+          rpc.Api.GetTransactionStatus.SUCCESS,
+      );
+
+      let newBalance = (await balanceTx.simulate()).result;
+      let newBalanceBob = (await balanceTxBob.simulate()).result;
+
+      expect(newBalance).toBe(balance - BigInt(2));
+      expect(newBalanceBob).toBe(balanceBob + BigInt(2));
+    })
   });
 });
 
@@ -572,6 +636,7 @@ type TestContext = {
   sac_wrapped: string;
   wrapper: string;
   controller: string;
+  swap_contract: string;
   state: TestState;
 };
 
