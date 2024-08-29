@@ -386,14 +386,14 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log(mintTx.needsNonInvokerSigningBy());
 
       // TODO: ???
-      mintTx.raw = TransactionBuilder.cloneFrom(mintTx.built!, {
-        fee: mintTx.built!.fee,
-        sorobanData: new SorobanDataBuilder(
-          tx.simulationData.transactionData.toXDR(),
-        )
-          .setResourceFee(BigInt(10000000))
-          .build(),
-      });
+      // mintTx.raw = TransactionBuilder.cloneFrom(mintTx.built!, {
+      //   fee: mintTx.built!.fee,
+      //   sorobanData: new SorobanDataBuilder(
+      //     mintTx.simulationData.transactionData.toXDR(),
+      //   )
+      //     .setResourceFee(BigInt(10000000))
+      //     .build(),
+      // });
       await mintTx.simulate();
       await mintTx.sign({
         signTransaction: signer(submitter).signTransaction,
@@ -606,6 +606,67 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       expect(newBalance).toBe(balance - BigInt(2));
       expect(newBalanceBob).toBe(balanceBob + BigInt(2));
+    })
+
+    it ("Can swap", async () => {
+      let balanceTxSAC = await sacTokenClient!.balance({ id: alice.publicKey() });
+      let balanceSAC = (await balanceTxSAC.simulate()).result;
+      let balanceTxBobSAC = await sacTokenClient!.balance({ id: bob.publicKey() });
+      let balanceBobSAC = (await balanceTxBobSAC.simulate()).result;
+
+      let balanceTxWrapped = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+      let balanceWrapped = (await balanceTxWrapped.simulate()).result;
+      let balanceTxBobWrapped = await wrappedTokenClient!.balance({ id: bob.publicKey() });
+      let balanceBobWrapped = (await balanceTxBobWrapped.simulate()).result;
+
+      let swapTx = await swapClient!.simple_swap(
+          {
+            from: alice.publicKey(),
+            to: bob.publicKey(),
+            token_from: testContext!.sac,
+            token_to: testContext!.sac_wrapped,
+            amount: BigInt(5),
+          },
+          { fee: 100000000 },
+      );
+      console.log(swapTx.needsNonInvokerSigningBy());
+      console.log(swapTx.toXDR());
+
+      await swapTx.signAuthEntries({
+        publicKey: alice.publicKey(),
+        signAuthEntry: signer(alice).signAuthEntry,
+      });
+      console.log(swapTx.needsNonInvokerSigningBy());
+      await swapTx.signAuthEntries({
+        publicKey: bob.publicKey(),
+        signAuthEntry: signer(bob).signAuthEntry,
+      });
+      console.log(swapTx.needsNonInvokerSigningBy());
+
+      await swapTx.simulate();
+      await swapTx.sign({
+        signTransaction: signer(submitter).signTransaction,
+      });
+      console.log(swapTx.toXDR());
+
+      let result = await swapTx.send();
+      let hash = result.sendTransactionResponse?.hash;
+      console.log("Transfer transaction hash: " + hash);
+      expect(hash).toBeDefined();
+      expect(result.getTransactionResponse?.status).toBe(
+          rpc.Api.GetTransactionStatus.SUCCESS,
+      );
+
+      let newBalanceSAC = (await balanceTxSAC.simulate()).result;
+      let newBalanceBobSAC = (await balanceTxBobSAC.simulate()).result;
+      let newBalanceWrapped = (await balanceTxWrapped.simulate()).result;
+      let newBalanceBobWrapped = (await balanceTxBobWrapped.simulate()).result;
+
+      expect(newBalanceSAC).toBe(balanceSAC - BigInt(5));
+      expect(newBalanceBobSAC).toBe(balanceBobSAC + BigInt(5));
+
+      expect(newBalanceWrapped).toBe(balanceWrapped + BigInt(5));
+      expect(newBalanceBobWrapped).toBe(balanceBobWrapped - BigInt(5));
     })
   });
 });

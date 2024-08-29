@@ -33,7 +33,7 @@ if (typeof window !== 'undefined') {
 export const networks = {
   testnet: {
     networkPassphrase: "Test SDF Network ; September 2015",
-    contractId: "CDKXUDSPY425K4VRM6XGBAG3TKLZOCLNEH4BK73V5UV5X3JLXZD7SJEK",
+    contractId: "CC4LYSQTRZS7J2P2GYGAVTFG2QIPIPVGDPBLQGJ3UBC74K527U4RBGQW",
   }
 } as const
 
@@ -62,15 +62,37 @@ export interface SwapClient {
     simulate?: boolean;
   }) => Promise<AssembledTransaction<null>>
 
+  /**
+   * Construct and simulate a simple_swap transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  simple_swap: ({from, to, token_from, token_to, amount}: {from: string, to: string, token_from: string, token_to: string, amount: i128}, options?: {
+    /**
+     * The fee to pay for the transaction. Default: BASE_FEE
+     */
+    fee?: number;
+
+    /**
+     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+     */
+    timeoutInSeconds?: number;
+
+    /**
+     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+     */
+    simulate?: boolean;
+  }) => Promise<AssembledTransaction<null>>
+
 }
 export class SwapClient extends ContractClient {
   constructor(public readonly options: ContractClientOptions) {
     super(
-      new ContractSpec([ "AAAAAAAAAAAAAAARZGVsZWdhdGVfdHJhbnNmZXIAAAAAAAAEAAAAAAAAAAVhc3NldAAAAAAAABMAAAAAAAAABGZyb20AAAATAAAAAAAAAAJ0bwAAAAAAEwAAAAAAAAAGYW1vdW50AAAAAAALAAAAAA==" ]),
-      options
+        new ContractSpec([ "AAAAAAAAAAAAAAARZGVsZWdhdGVfdHJhbnNmZXIAAAAAAAAEAAAAAAAAAAVhc3NldAAAAAAAABMAAAAAAAAABGZyb20AAAATAAAAAAAAAAJ0bwAAAAAAEwAAAAAAAAAGYW1vdW50AAAAAAALAAAAAA==",
+          "AAAAAAAAAAAAAAALc2ltcGxlX3N3YXAAAAAABQAAAAAAAAAEZnJvbQAAABMAAAAAAAAAAnRvAAAAAAATAAAAAAAAAAp0b2tlbl9mcm9tAAAAAAATAAAAAAAAAAh0b2tlbl90bwAAABMAAAAAAAAABmFtb3VudAAAAAAACwAAAAA=" ]),
+        options
     )
   }
   public readonly fromJSON = {
-    delegate_transfer: this.txFromJSON<null>
+    delegate_transfer: this.txFromJSON<null>,
+    simple_swap: this.txFromJSON<null>
   }
 }
