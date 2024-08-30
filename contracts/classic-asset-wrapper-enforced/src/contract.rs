@@ -177,6 +177,9 @@ impl SpecifcFeaturesTrait for WrapperInterface {
     fn initialize(e: Env, admin: Address, asset: Address, asset_controller: Address) {
         is_contract_not_initialized_validation(&e);
 
+        // If add asset.require_auth() can't use cli to sign. Do we need asset.require_auth() if
+        // using non-issuer account?
+        // asset.require_auth();
         admin.require_auth();
 
         let metadata = WrapperMetadata {

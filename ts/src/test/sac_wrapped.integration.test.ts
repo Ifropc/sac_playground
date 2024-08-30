@@ -8,7 +8,7 @@ import {
   SorobanDataBuilder,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
-import { beforeAll, beforeEach, describe, it } from "@jest/globals";
+import { afterAll, beforeAll, beforeEach, describe, it } from "@jest/globals";
 import * as dotenv from "dotenv";
 import * as fs from "node:fs";
 
@@ -26,30 +26,31 @@ const network = "Test SDF Network ; September 2015";
 const rpcUrl = "https://soroban-testnet.stellar.org";
 const rpcServer = new rpc.Server(rpcUrl);
 const horizon = new Horizon.Server("https://horizon-testnet.stellar.org");
-// GCXDFJ7AZGIVCUKFOYNJ57I2RRBSWG2RNV3FKPVHYZXL3PXVTVTIR6KZ
-const alice = Keypair.fromSecret(
-  "SB3U4SFHDLTN3CJ2WWMDHD64TOV55TDVAJD2KXA3LRK6H5EWYUFS6BTP",
-);
-// GAHK5N2WYMCMI5CACR4XHU6MKKADVVD7PCDULWSVRCVGFQXO7BVRLZGR
-const bob = Keypair.fromSecret(
-  "SCTBD2AHMQ22JWK4RBJR5SUGSI4UIFQS5GYTE3B42ALBPATQM4C5BIS3",
-);
-// GCVTWAFW5XK5IEMVN25FCZDNYSY6HRRMAARGD2Z63Q2YHXPFAGRWRR63
-const submitter = Keypair.fromSecret(
-  "SAGWTKL4QMP24C56JVXIVOZ232QDUXTJ6DXDEVT4BIBCLJTOL3SB4NKJ",
-);
 
 describe("Integration tests for wrapped Stellar Asset Contract", () => {
   dotenv.config();
   let command = "stellar";
-  // GBIJQTM4JZXO6LASTSY3IWQCFPUDLDGTQ6PAFBAZLG2RLZIXTHBNVMU6
+  // GDF7FZPAMPF2A3CUNJPNTR4KEDT2O4MZIDFWMS7HLICQURYP3VYH27PY
   let issuer = Keypair.fromSecret(
-    "SBVZEKCUCGYOFEK7IVDECV2KVFAOR3MYS4BLSWSRHT2J6PHBXBSRZCZF",
+    "SBTQH5SNCECA55HDOBURWU6YYYFEY2X7YQVIR7VRFGJUVRSPXMN3XIZP",
   );
-  // GB2MTO72T7DNJAY5O2VA6WBLGRT7NP2D2N42SA656VINUH3KXBLPTXGR
+  // GD3FK5LMPLW5EXNZW2M22FWJLAXAOGRBMR2U3QH257PMSPYHKVXAF5NR
   let admin = Keypair.fromSecret(
-    "SBLNCXNZNMNNVCSHKJJCUN6ZE4YJPXNTP7IJUZVVPRNL7NTZD3WC5O2K",
+    "SCRBZIUSSKPAMCNBQNQQLKRYBYHEP3ZKUDUIZXPPYUVSEET5R6R56YIE",
   );
+  // GASWA5TV26JSXSN6GQYAVTPIASCMY4PZ4EP74DKRL5JWWBLHALSZVVL4
+  let alice = Keypair.fromSecret(
+      "SBHUNZPOKB2V7CEQ7KZNUI22FJIHRGXI2CS4SSMYS6YYASVAB22YGMTH",
+  );
+  // GBFS3HC6YVOGNYDXTROOQ6K6WS35SKXNEJCZPEXLGQZ6BCNPA52KZRPF
+  let bob = Keypair.fromSecret(
+      "SBLUEUFAAAOH7AFGYRTOEU6GWGJE46E6IQHKNJ5LNE2VGBP543X3IKAW",
+  );
+  // GCTIR5DNCNSG42UDEFXATIS45ZWHKEYBNEGXNPIGUNBHTJCMG56VGX7F
+  let submitter = Keypair.fromSecret(
+      "SA3Y5QWX73HUDENABF7UX27ZMCDMQMERFSCFTTPCEYMPKIP5DGQRVX2I",
+  );
+
   let sacTokenClient: TokenClient | null;
   let wrappedTokenClient: TokenClient | null;
   let underlyingSACTokenClient: TokenClient | null;
@@ -64,6 +65,18 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     }
     if (process.env.ISSUER_KEY) {
       issuer = Keypair.fromSecret(process.env.ISSUER_KEY);
+    }
+    if (process.env.ADMIN_KEY) {
+      admin = Keypair.fromSecret(process.env.ADMIN_KEY);
+    }
+    if (process.env.ALICE_KEY) {
+      alice = Keypair.fromSecret(process.env.ALICE_KEY);
+    }
+    if (process.env.BOB_KEY) {
+      bob = Keypair.fromSecret(process.env.BOB_KEY);
+    }
+    if (process.env.SUBMITTER_KEY) {
+      submitter = Keypair.fromSecret(process.env.SUBMITTER_KEY);
     }
     console.log("Using issuer key " + issuer.publicKey());
   });
@@ -116,20 +129,23 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           issuer.secret() +
           " " +
           command +
-          " keys add e2e-test-key --secret-key",
+          " keys add test-issuer-key --secret-key",
       );
       await exec(
         "SOROBAN_SECRET_KEY=" +
           admin.secret() +
           " " +
           command +
-          " keys add e2e-admin --secret-key",
+          " keys add test-admin-key --secret-key",
       );
-      let { stdout3 } = await exec(command + " keys ls");
-      expect(stdout3).toContain("e2e-admin");
-      expect(stdout3).toContain("e2e-test-key");
+      let { stdout, __ } = await exec(command + " keys ls");
+      const str: string = stdout
+      expect(str).toContain("test-admin-key");
+      expect(str).toContain("test-issuer-key");
     });
-    console.log("CLI OK");
+    afterAll(() => {
+      console.log("CLI OK");
+    })
   });
 
   describe("Test setup", () => {
@@ -152,7 +168,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           command +
             " contract asset deploy --asset " +
             asset +
-            " --source-account e2e-test-key --network testnet",
+            " --source-account test-issuer-key --network testnet",
         );
         expect(stderr).toBe("");
         const contract: string = stdout.trim();
@@ -179,6 +195,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         const result = await rpcServer.sendTransaction(aliceTrust);
         const hash = result.hash;
         console.log("Sent trustline transaction: " + hash);
+        // >> TODO [sdk]: is this piece of code somewhere in the SDK? If not, should it be there?
         for (let i = 0; i <= 30; i++) {
           const txResult = await rpcServer.getTransaction(hash);
           if (txResult.status == rpc.Api.GetTransactionStatus.NOT_FOUND) {
@@ -189,18 +206,20 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
             break;
           }
         }
+        // <<
         console.log("Trustline set for " + kp.publicKey());
       }
 
       async function deploy_contract(contract_name: string) {
         const { stdout, stderr } = await exec(
           command +
-            " contract deploy --source-account e2e-test-key --network testnet --wasm target/wasm32-unknown-unknown/release/" +
+            " contract deploy --source-account test-issuer-key --network testnet --wasm target/wasm32-unknown-unknown/release/" +
             contract_name +
             ".wasm",
         );
         expect(stderr).toBe("");
         const output: string = stdout;
+        // TODO [cli] improve output
         const contract = output.split("Deployed!")[1].trim();
         console.log("Deployed " + contract_name + ": " + contract);
         return contract;
@@ -234,62 +253,121 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       expect(testContext?.asset).toBeDefined();
     });
 
-    it("Should initialize wrapped contract", async () => {
+    // Contract initialization tests that are NOT working (could be a bug or I'm doing something wrong).
+    // For working version see below
+    // Using admin.publicKey() as the Admin
+    it.skip("Should initialize wrapped contract, setting admin", async () => {
       expect(wrappedFunctionClient).toBeDefined();
       if (testContext!.state >= TestState.wrapper_initialized) {
         console.log("Wrapped already initialized");
         return;
       }
 
-      console.log(testContext!.sac_wrapped + " " + testContext!.controller);
+      // Error with "[recording authorization only] encountered authorization not
+      // tied to the root contract invocation for an address. Use `require_auth()` in the top invocation
+      // or enable non-root authorization."
+      // This error is really strange, because we do have admin.require_auth() call in the contract
+      const { stdout, stderr } = await exec(
+          command +
+          " contract invoke --sim-only --network testnet --source-account test-issuer-key --id " +
+          testContext!.wrapper +
+          " -- initialize " +
+          " --admin " +
+          admin.publicKey() +
+          " --asset " +
+          testContext!.sac_wrapped +
+          " --asset_controller " +
+          testContext!.controller,
+      );
+
+      expect(stderr).toContain("in_successful_contract_call: true");
+
+      testContext!.state = TestState.wrapper_initialized;
+      writeContext(testContext!);
+    });
+
+    // Using admin-key as the submitter + admin
+    // (I assume transaction should be signed by the issuer, as asset.require_auth() is called)
+    // Same error as above
+    it.skip("Should initialize wrapped contract, setting admin and using admin key", async () => {
+      expect(wrappedFunctionClient).toBeDefined();
+      if (testContext!.state >= TestState.wrapper_initialized) {
+        console.log("Wrapped already initialized");
+        return;
+      }
+
+      // Error with "[recording authorization only] encountered authorization not
+      // tied to the root contract invocation for an address. Use `require_auth()` in the top invocation
+      // or enable non-root authorization."
+      const { stdout, stderr } = await exec(
+          command +
+          " contract invoke --sim-only --network testnet --source-account test-admin-key --id " +
+          testContext!.wrapper +
+          " -- initialize " +
+          " --admin " +
+          admin.publicKey() +
+          " --asset " +
+          testContext!.sac_wrapped +
+          " --asset_controller " +
+          testContext!.controller,
+      );
+
+      expect(stderr).toContain("in_successful_contract_call: true");
+
+      testContext!.state = TestState.wrapper_initialized;
+      writeContext(testContext!);
+    });
+
+    it("Should initialize wrapped contract using SDK", async () => {
+      expect(wrappedFunctionClient).toBeDefined();
+      if (testContext!.state >= TestState.wrapper_initialized) {
+        console.log("Wrapped already initialized");
+        return;
+      }
 
       let tx = await wrappedFunctionClient!.initialize({
-        admin: admin.publicKey(),
+        admin: issuer.publicKey(),
         asset: testContext!.sac_wrapped,
         asset_controller: testContext!.controller,
       });
 
-      // TODO: this doesn't match cli output
-      // console.log(tx.toXDR())
-      // const res = await tx.simulate()
+      console.log(tx.toXDR())
+      console.log(tx.needsNonInvokerSigningBy())
+
+      await tx.simulate()
+      await tx.sign({
+        signTransaction: signer(issuer).signTransaction
+      })
+
+      let result = await tx.send();
+      let hash = result.sendTransactionResponse?.hash;
+      console.log("Init wrapped contract transaction hash: " + hash);
+      expect(hash).toBeDefined();
+      expect(result.getTransactionResponse?.status).toBe(
+          rpc.Api.GetTransactionStatus.SUCCESS,
+      );
+    })
+
+    // Same version as above just using cli
+    it.skip("Should initialize wrapped contract", async () => {
+      expect(wrappedFunctionClient).toBeDefined();
+      if (testContext!.state >= TestState.wrapper_initialized) {
+        console.log("Wrapped already initialized");
+        return;
+      }
 
       const { stdout, stderr } = await exec(
         command +
-          // TODO: run with different account (e2e-admin)
-          " contract invoke --network testnet --source-account e2e-test-key --id " +
+          " contract invoke --network testnet --source-account test-issuer-key --id " +
           testContext!.wrapper +
           " -- initialize " +
           " --admin " +
-          // TODO: not working with different admin (why?)
           issuer.publicKey() +
           " --asset " +
           testContext!.sac_wrapped +
           " --asset_controller " +
           testContext!.controller,
       );
-      // TODO: not working with e2e-admin key
-
-      // const xdr: string = stdout;
-      //
-      // tx = wrappedFunctionClient!.txFromXDR(xdr.trim())
-
-      // await tx.signAuthEntries({
-      //   publicKey: issuer.publicKey(),
-      //   signAuthEntry: signer(issuer).signAuthEntry
-      // })
-
-      // await tx.simulate()
-      // await tx.sign({
-      //   signTransaction: signer(issuer).signTransaction
-      // })
-      //
-      // let result = await tx.send();
-      // let hash = result.sendTransactionResponse?.hash;
-      // console.log("Init wrapped contract transaction hash: " + hash);
-      // expect(hash).toBeDefined();
-      // expect(result.getTransactionResponse?.status).toBe(
-      //     rpc.Api.GetTransactionStatus.SUCCESS,
-      // );
 
       expect(stderr).toContain("in_successful_contract_call: true");
 
@@ -308,7 +386,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         command +
           " contract invoke --id " +
           testContext!.wrapper +
-          " --network testnet --source-account e2e-test-key -- set_admin --new_admin " +
+          " --network testnet --source-account test-issuer-key -- set_admin --new_admin " +
           admin.publicKey(),
       );
 
@@ -316,7 +394,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         command +
           " contract invoke --id " +
           testContext!.wrapper +
-          " --network testnet --source-account e2e-test-key -- get_admin",
+          " --network testnet --source-account test-issuer-key -- get_admin",
       );
 
       expect(stdout).toContain(admin.publicKey());
@@ -338,7 +416,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         command +
           " contract invoke --id " +
           testContext!.controller +
-          " --network testnet --source-account e2e-admin -- initialize --admin " +
+          " --network testnet --source-account test-admin-key -- initialize --admin " +
           admin.publicKey() +
           " --asset " +
           testContext!.wrapper +
@@ -351,6 +429,10 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       testContext!.state = TestState.controller_initialized;
       writeContext(testContext!);
     });
+
+    afterAll(() => {
+      console.log("Test initialized with context: " + JSON.stringify(testContext))
+    })
   });
 
   describe("Regular SAC test", () => {
@@ -385,7 +467,8 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       });
       console.log(mintTx.needsNonInvokerSigningBy());
 
-      // TODO: ???
+      // TODO: [js-sdk] this piece of code was previously not working due to resource fees, see https://discord.com/channels/897514728459468821/1247601679239614618/1247601679239614618
+      // TODO: [js-sdk] this should be easily changeable within the SDK. Note that options.fee doesn't change resourceFee
       // mintTx.raw = TransactionBuilder.cloneFrom(mintTx.built!, {
       //   fee: mintTx.built!.fee,
       //   sorobanData: new SorobanDataBuilder(
@@ -460,15 +543,6 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       });
       console.log(mintTx.needsNonInvokerSigningBy());
 
-      // TODO: ???
-      mintTx.raw = TransactionBuilder.cloneFrom(mintTx.built!, {
-        fee: mintTx.built!.fee,
-        sorobanData: new SorobanDataBuilder(
-            tx.simulationData.transactionData.toXDR(),
-        )
-            .setResourceFee(BigInt(10000000))
-            .build(),
-      });
       await mintTx.simulate();
       await mintTx.sign({
         signTransaction: signer(submitter).signTransaction,
@@ -524,15 +598,6 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       });
       console.log(transferTx.needsNonInvokerSigningBy());
 
-      // TODO: ???
-      transferTx.raw = TransactionBuilder.cloneFrom(transferTx.built!, {
-        fee: transferTx.built!.fee,
-        sorobanData: new SorobanDataBuilder(
-            balanceTx.simulationData.transactionData.toXDR(),
-        )
-            .setResourceFee(BigInt(10000000))
-            .build(),
-      });
       await transferTx.simulate();
       await transferTx.sign({
         signTransaction: signer(submitter).signTransaction,
@@ -578,15 +643,6 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       });
       console.log(transferTx.needsNonInvokerSigningBy());
 
-      // TODO: ???
-      transferTx.raw = TransactionBuilder.cloneFrom(transferTx.built!, {
-        fee: transferTx.built!.fee,
-        sorobanData: new SorobanDataBuilder(
-            balanceTx.simulationData.transactionData.toXDR(),
-        )
-            .setResourceFee(BigInt(10000000))
-            .build(),
-      });
       await transferTx.simulate();
       await transferTx.sign({
         signTransaction: signer(submitter).signTransaction,
