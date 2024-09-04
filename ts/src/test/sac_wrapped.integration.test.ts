@@ -5,7 +5,6 @@ import {
   Keypair,
   Operation,
   rpc,
-  SorobanDataBuilder,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { afterAll, beforeAll, beforeEach, describe, it } from "@jest/globals";
@@ -13,11 +12,15 @@ import * as dotenv from "dotenv";
 import * as fs from "node:fs";
 
 import * as process from "node:process";
+// @ts-ignore
 import { TokenClient } from "../bindings/token";
+// @ts-ignore
 import { WrappedClient } from "../bindings/wrapped_client";
+// @ts-ignore
 import { TokenControllerClient } from "../bindings/controller";
+// @ts-ignore
+import { SwapClient } from "../bindings/swap";
 import BalanceLineAsset = Horizon.HorizonApi.BalanceLineAsset;
-import {SwapClient} from "../bindings/swap";
 
 export * as rpc from "@stellar/stellar-sdk/rpc";
 const util = require("node:util");
@@ -40,15 +43,15 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
   );
   // GASWA5TV26JSXSN6GQYAVTPIASCMY4PZ4EP74DKRL5JWWBLHALSZVVL4
   let alice = Keypair.fromSecret(
-      "SBHUNZPOKB2V7CEQ7KZNUI22FJIHRGXI2CS4SSMYS6YYASVAB22YGMTH",
+    "SBHUNZPOKB2V7CEQ7KZNUI22FJIHRGXI2CS4SSMYS6YYASVAB22YGMTH",
   );
   // GBFS3HC6YVOGNYDXTROOQ6K6WS35SKXNEJCZPEXLGQZ6BCNPA52KZRPF
   let bob = Keypair.fromSecret(
-      "SBLUEUFAAAOH7AFGYRTOEU6GWGJE46E6IQHKNJ5LNE2VGBP543X3IKAW",
+    "SBLUEUFAAAOH7AFGYRTOEU6GWGJE46E6IQHKNJ5LNE2VGBP543X3IKAW",
   );
   // GCTIR5DNCNSG42UDEFXATIS45ZWHKEYBNEGXNPIGUNBHTJCMG56VGX7F
   let submitter = Keypair.fromSecret(
-      "SA3Y5QWX73HUDENABF7UX27ZMCDMQMERFSCFTTPCEYMPKIP5DGQRVX2I",
+    "SA3Y5QWX73HUDENABF7UX27ZMCDMQMERFSCFTTPCEYMPKIP5DGQRVX2I",
   );
 
   let sacTokenClient: TokenClient | null;
@@ -56,7 +59,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
   let underlyingSACTokenClient: TokenClient | null;
   let wrappedFunctionClient: WrappedClient | null;
   let controllerClient: TokenControllerClient | null;
-  let swapClient: SwapClient | null
+  let swapClient: SwapClient | null;
   let testContext: TestContext | null;
 
   beforeAll(() => {
@@ -139,13 +142,13 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           " keys add test-admin-key --secret-key",
       );
       let { stdout, __ } = await exec(command + " keys ls");
-      const str: string = stdout
+      const str: string = stdout;
       expect(str).toContain("test-admin-key");
       expect(str).toContain("test-issuer-key");
     });
     afterAll(() => {
       console.log("CLI OK");
-    })
+    });
   });
 
   describe("Test setup", () => {
@@ -268,7 +271,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       // or enable non-root authorization."
       // This error is really strange, because we do have admin.require_auth() call in the contract
       const { stdout, stderr } = await exec(
-          command +
+        command +
           " contract invoke --sim-only --network testnet --source-account test-issuer-key --id " +
           testContext!.wrapper +
           " -- initialize " +
@@ -300,7 +303,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       // tied to the root contract invocation for an address. Use `require_auth()` in the top invocation
       // or enable non-root authorization."
       const { stdout, stderr } = await exec(
-          command +
+        command +
           " contract invoke --sim-only --network testnet --source-account test-admin-key --id " +
           testContext!.wrapper +
           " -- initialize " +
@@ -331,22 +334,22 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         asset_controller: testContext!.controller,
       });
 
-      console.log(tx.toXDR())
-      console.log(tx.needsNonInvokerSigningBy())
+      console.log(tx.toXDR());
+      console.log(tx.needsNonInvokerSigningBy());
 
-      await tx.simulate()
+      await tx.simulate();
       await tx.sign({
-        signTransaction: signer(issuer).signTransaction
-      })
+        signTransaction: signer(issuer).signTransaction,
+      });
 
       let result = await tx.send();
       let hash = result.sendTransactionResponse?.hash;
       console.log("Init wrapped contract transaction hash: " + hash);
       expect(hash).toBeDefined();
       expect(result.getTransactionResponse?.status).toBe(
-          rpc.Api.GetTransactionStatus.SUCCESS,
+        rpc.Api.GetTransactionStatus.SUCCESS,
       );
-    })
+    });
 
     // Same version as above just using cli
     it.skip("Should initialize wrapped contract", async () => {
@@ -431,8 +434,10 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     });
 
     afterAll(() => {
-      console.log("Test initialized with context: " + JSON.stringify(testContext))
-    })
+      console.log(
+        "Test initialized with context: " + JSON.stringify(testContext),
+      );
+    });
   });
 
   describe("Regular SAC test", () => {
@@ -505,8 +510,8 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
             (x as BalanceLineAsset).asset_code ==
             testContext!.asset.split(":")[0],
         )?.balance;
-      expect(classicBalance).toBeDefined()
-      expect(parseFloat(classicBalance!)).toBe((Number(newBalance) / 10000000));
+      expect(classicBalance).toBeDefined();
+      expect(parseFloat(classicBalance!)).toBe(Number(newBalance) / 10000000);
     });
   });
 
@@ -514,7 +519,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     beforeEach(() => {
       expect(wrappedTokenClient).toBeDefined();
       expect(testContext).toBeDefined();
-      expect(testContext!.state).toBe(TestState.controller_initialized)
+      expect(testContext!.state).toBe(TestState.controller_initialized);
     });
 
     it("Can get the name", async () => {
@@ -528,11 +533,11 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       let balance = (await tx.simulate()).result;
 
       let mintTx = await wrappedTokenClient!.mint(
-          {
-            to: alice.publicKey(),
-            amount: BigInt(12345),
-          },
-          { fee: 100000000 },
+        {
+          to: alice.publicKey(),
+          amount: BigInt(12345),
+        },
+        { fee: 100000000 },
       );
       console.log(mintTx.needsNonInvokerSigningBy());
       console.log(mintTx.toXDR());
@@ -554,40 +559,44 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log("Mint transaction hash: " + hash);
       expect(hash).toBeDefined();
       expect(result.getTransactionResponse?.status).toBe(
-          rpc.Api.GetTransactionStatus.SUCCESS,
+        rpc.Api.GetTransactionStatus.SUCCESS,
       );
 
       let newBalance = (await tx.simulate()).result;
 
       expect(newBalance).toBe(balance + BigInt(12345));
       let aliceAccount = await horizon
-          .accounts()
-          .accountId(alice.publicKey())
-          .call();
+        .accounts()
+        .accountId(alice.publicKey())
+        .call();
       let classicBalance = aliceAccount.balances
-          .filter((x) => x.asset_type == "credit_alphanum12")
-          .find(
-              (x) =>
-                  (x as BalanceLineAsset).asset_code ==
-                  testContext!.asset_wrapped.split(":")[0],
-          )?.balance;
-      expect(classicBalance).toBeDefined()
-      expect(parseFloat(classicBalance!)).toBe((Number(newBalance) / 10000000));
+        .filter((x) => x.asset_type == "credit_alphanum12")
+        .find(
+          (x) =>
+            (x as BalanceLineAsset).asset_code ==
+            testContext!.asset_wrapped.split(":")[0],
+        )?.balance;
+      expect(classicBalance).toBeDefined();
+      expect(parseFloat(classicBalance!)).toBe(Number(newBalance) / 10000000);
     });
 
     it("Can transfer Alice -> Bob", async () => {
-      let balanceTx = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+      let balanceTx = await wrappedTokenClient!.balance({
+        id: alice.publicKey(),
+      });
       let balance = (await balanceTx.simulate()).result;
-      let balanceTxBob = await wrappedTokenClient!.balance({ id: bob.publicKey() });
+      let balanceTxBob = await wrappedTokenClient!.balance({
+        id: bob.publicKey(),
+      });
       let balanceBob = (await balanceTxBob.simulate()).result;
 
       let transferTx = await wrappedTokenClient!.transfer(
-          {
-            from: alice.publicKey(),
-            to: bob.publicKey(),
-            amount: BigInt(3),
-          },
-          { fee: 100000000 },
+        {
+          from: alice.publicKey(),
+          to: bob.publicKey(),
+          amount: BigInt(3),
+        },
+        { fee: 100000000 },
       );
       console.log(transferTx.needsNonInvokerSigningBy());
       console.log(transferTx.toXDR());
@@ -609,7 +618,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log("Transfer transaction hash: " + hash);
       expect(hash).toBeDefined();
       expect(result.getTransactionResponse?.status).toBe(
-          rpc.Api.GetTransactionStatus.SUCCESS,
+        rpc.Api.GetTransactionStatus.SUCCESS,
       );
 
       let newBalance = (await balanceTx.simulate()).result;
@@ -619,20 +628,24 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       expect(newBalanceBob).toBe(balanceBob + BigInt(3));
     });
 
-    it ("Can delegate transfer", async () => {
-      let balanceTx = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+    it("Can delegate transfer", async () => {
+      let balanceTx = await wrappedTokenClient!.balance({
+        id: alice.publicKey(),
+      });
       let balance = (await balanceTx.simulate()).result;
-      let balanceTxBob = await wrappedTokenClient!.balance({ id: bob.publicKey() });
+      let balanceTxBob = await wrappedTokenClient!.balance({
+        id: bob.publicKey(),
+      });
       let balanceBob = (await balanceTxBob.simulate()).result;
 
       let transferTx = await swapClient!.delegate_transfer(
-          {
-            asset: testContext!.wrapper,
-            from: alice.publicKey(),
-            to: bob.publicKey(),
-            amount: BigInt(2),
-          },
-          { fee: 100000000 },
+        {
+          asset: testContext!.wrapper,
+          from: alice.publicKey(),
+          to: bob.publicKey(),
+          amount: BigInt(2),
+        },
+        { fee: 100000000 },
       );
       console.log(transferTx.needsNonInvokerSigningBy());
       console.log(transferTx.toXDR());
@@ -654,7 +667,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log("Transfer transaction hash: " + hash);
       expect(hash).toBeDefined();
       expect(result.getTransactionResponse?.status).toBe(
-          rpc.Api.GetTransactionStatus.SUCCESS,
+        rpc.Api.GetTransactionStatus.SUCCESS,
       );
 
       let newBalance = (await balanceTx.simulate()).result;
@@ -662,28 +675,36 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       expect(newBalance).toBe(balance - BigInt(2));
       expect(newBalanceBob).toBe(balanceBob + BigInt(2));
-    })
+    });
 
-    it ("Can swap", async () => {
-      let balanceTxSAC = await sacTokenClient!.balance({ id: alice.publicKey() });
+    it("Can swap", async () => {
+      let balanceTxSAC = await sacTokenClient!.balance({
+        id: alice.publicKey(),
+      });
       let balanceSAC = (await balanceTxSAC.simulate()).result;
-      let balanceTxBobSAC = await sacTokenClient!.balance({ id: bob.publicKey() });
+      let balanceTxBobSAC = await sacTokenClient!.balance({
+        id: bob.publicKey(),
+      });
       let balanceBobSAC = (await balanceTxBobSAC.simulate()).result;
 
-      let balanceTxWrapped = await wrappedTokenClient!.balance({ id: alice.publicKey() });
+      let balanceTxWrapped = await wrappedTokenClient!.balance({
+        id: alice.publicKey(),
+      });
       let balanceWrapped = (await balanceTxWrapped.simulate()).result;
-      let balanceTxBobWrapped = await wrappedTokenClient!.balance({ id: bob.publicKey() });
+      let balanceTxBobWrapped = await wrappedTokenClient!.balance({
+        id: bob.publicKey(),
+      });
       let balanceBobWrapped = (await balanceTxBobWrapped.simulate()).result;
 
       let swapTx = await swapClient!.simple_swap(
-          {
-            from: alice.publicKey(),
-            to: bob.publicKey(),
-            token_from: testContext!.sac,
-            token_to: testContext!.sac_wrapped,
-            amount: BigInt(5),
-          },
-          { fee: 100000000 },
+        {
+          from: alice.publicKey(),
+          to: bob.publicKey(),
+          token_from: testContext!.sac,
+          token_to: testContext!.sac_wrapped,
+          amount: BigInt(5),
+        },
+        { fee: 100000000 },
       );
       console.log(swapTx.needsNonInvokerSigningBy());
       console.log(swapTx.toXDR());
@@ -710,7 +731,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log("Transfer transaction hash: " + hash);
       expect(hash).toBeDefined();
       expect(result.getTransactionResponse?.status).toBe(
-          rpc.Api.GetTransactionStatus.SUCCESS,
+        rpc.Api.GetTransactionStatus.SUCCESS,
       );
 
       let newBalanceSAC = (await balanceTxSAC.simulate()).result;
@@ -723,7 +744,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       expect(newBalanceWrapped).toBe(balanceWrapped + BigInt(5));
       expect(newBalanceBobWrapped).toBe(balanceBobWrapped - BigInt(5));
-    })
+    });
   });
 });
 

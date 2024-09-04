@@ -11,6 +11,7 @@ test:
 clean_js:
 	rm -rf dist
 	rm -rf node_modules
+	rm -rf ts/node_modules
 
 clean_test:
 	rm -rf .soroban
@@ -19,10 +20,4 @@ clean_test:
 clean_contracts:
 	rm -rf target
 
-clean:
-	clean_js
-	clean_test
-	clean_contracts
-
-
-
+clean: clean_js clean_test clean_contracts
