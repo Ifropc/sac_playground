@@ -45,6 +45,8 @@ pub trait SpecifcFeaturesTrait {
     // Mint an arbitrary amount of asset units directly to
     // the 'to' address.
     fn mint(e: Env, to: Address, amount: i128);
+
+    fn mint_flatten(e: Env, to: Address, amount: i128);
 }
 
 #[contract]
@@ -207,5 +209,19 @@ impl SpecifcFeaturesTrait for WrapperInterface {
 
         let addresses = vec![&e, to.clone()];
         execute_with_temporary_authorizations(&e, addresses, action);
+    }
+
+    // Does same stuff as mint but no underlying function calls
+    fn mint_flatten(e: Env, to: Address, amount: i128) {
+        is_admin_validation(&e);
+
+        let asset_address = read_asset(&e);
+        let asset_admin_client = token::StellarAssetClient::new(&e, &asset_address);
+
+        set_account_authorization(&e, to.clone(), true);
+
+        asset_admin_client.mint(&to, &amount);
+
+        set_account_authorization(&e, to.clone(), false);
     }
 }

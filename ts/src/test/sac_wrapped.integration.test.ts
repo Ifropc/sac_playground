@@ -1,10 +1,10 @@
 import {
-  Asset,
+  Asset, AuthRequiredFlag, AuthRevocableFlag,
   contract,
   Horizon,
   Keypair,
   Operation,
-  rpc,
+  rpc, Transaction,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { afterAll, beforeAll, beforeEach, describe, it } from "@jest/globals";
@@ -21,6 +21,7 @@ import { TokenControllerClient } from "../bindings/controller";
 // @ts-ignore
 import { SwapClient } from "../bindings/swap";
 import BalanceLineAsset = Horizon.HorizonApi.BalanceLineAsset;
+import {AuthFlag} from "@stellar/stellar-base";
 
 export * as rpc from "@stellar/stellar-sdk/rpc";
 const util = require("node:util");
@@ -33,8 +34,12 @@ const horizon = new Horizon.Server("https://horizon-testnet.stellar.org");
 describe("Integration tests for wrapped Stellar Asset Contract", () => {
   dotenv.config();
   let command = "stellar";
+  // GCOSDE5QHBD6XZNBI3JNVTCNYHVSFLXYCIOAHH72KXGRYPULEAOEBBV3
+  let regularSacIssuer = Keypair.fromSecret(
+      "SC6WGHCO3HPRMD24JZDFBRE2FSF5AWNOF5SRZOCZPYIGU5VGQ33FOKJW",
+  );
   // GDF7FZPAMPF2A3CUNJPNTR4KEDT2O4MZIDFWMS7HLICQURYP3VYH27PY
-  let issuer = Keypair.fromSecret(
+  let wrappedIssuer = Keypair.fromSecret(
     "SBTQH5SNCECA55HDOBURWU6YYYFEY2X7YQVIR7VRFGJUVRSPXMN3XIZP",
   );
   // GD3FK5LMPLW5EXNZW2M22FWJLAXAOGRBMR2U3QH257PMSPYHKVXAF5NR
@@ -66,8 +71,11 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     if (process.env.STELLAR_CLI_PATH) {
       command = process.env.STELLAR_CLI_PATH;
     }
+    if (process.env.REGULAR_ISSUER_KEY) {
+      regularSacIssuer = Keypair.fromSecret(process.env.REGULAR_ISSUER_KEY);
+    }
     if (process.env.ISSUER_KEY) {
-      issuer = Keypair.fromSecret(process.env.ISSUER_KEY);
+      wrappedIssuer = Keypair.fromSecret(process.env.ISSUER_KEY);
     }
     if (process.env.ADMIN_KEY) {
       admin = Keypair.fromSecret(process.env.ADMIN_KEY);
@@ -81,26 +89,17 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     if (process.env.SUBMITTER_KEY) {
       submitter = Keypair.fromSecret(process.env.SUBMITTER_KEY);
     }
-    console.log("Using issuer key " + issuer.publicKey());
+    console.log("Using issuer key " + wrappedIssuer.publicKey());
   });
 
   beforeEach(() => {
     testContext = readContext();
     if (testContext?.sac) {
-      function makeTokenClient(contractId: string) {
-        return new TokenClient({
-          publicKey: submitter.publicKey(),
-          networkPassphrase: network,
-          rpcUrl: rpcUrl,
-          contractId: contractId,
-        });
-      }
-
-      sacTokenClient = makeTokenClient(testContext.sac);
-      wrappedTokenClient = makeTokenClient(testContext.wrapper);
-      underlyingSACTokenClient = makeTokenClient(testContext.sac_wrapped);
+      sacTokenClient = makeTokenClient(testContext.sac, submitter);
+      wrappedTokenClient = makeTokenClient(testContext.wrapper, submitter);
+      underlyingSACTokenClient = makeTokenClient(testContext.sac_wrapped, submitter);
       wrappedFunctionClient = new WrappedClient({
-        publicKey: issuer.publicKey(),
+        publicKey: wrappedIssuer.publicKey(),
         networkPassphrase: network,
         rpcUrl: rpcUrl,
         contractId: testContext.wrapper,
@@ -129,7 +128,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     it("cli should import keys", async () => {
       await exec(
         "SOROBAN_SECRET_KEY=" +
-          issuer.secret() +
+          wrappedIssuer.secret() +
           " " +
           command +
           " keys add test-issuer-key --secret-key",
@@ -158,7 +157,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         return;
       }
 
-      async function deploySAC() {
+      async function deploySAC(issuer: Keypair) {
         let ticker = (Math.random() * 1337)
           .toString(36)
           .replaceAll(/[0-9]|\./g, "")
@@ -175,29 +174,15 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         );
         expect(stderr).toBe("");
         const contract: string = stdout.trim();
-        console.log("Deployed contract " + contract);
 
-        return { contract, ticker };
+        return { contract, asset };
       }
 
-      async function addTrustline(ticker: string, kp: Keypair) {
-        let aliceAccount = await rpcServer.getAccount(kp.publicKey());
-
-        let aliceTrust = new TransactionBuilder(aliceAccount, {
-          fee: "1000",
-          timebounds: { minTime: 0, maxTime: 0 },
-          networkPassphrase: network,
-        })
-          .addOperation(
-            Operation.changeTrust({
-              asset: new Asset(ticker, issuer.publicKey()),
-            }),
-          )
-          .build();
-        aliceTrust.sign(kp);
-        const result = await rpcServer.sendTransaction(aliceTrust);
+      async function submitTransaction(tx: Transaction) {
+        const result = await rpcServer.sendTransaction(tx);
         const hash = result.hash;
-        console.log("Sent trustline transaction: " + hash);
+        console.log("Sent transaction: " + hash);
+
         // >> TODO [sdk]: is this piece of code somewhere in the SDK? If not, should it be there?
         for (let i = 0; i <= 30; i++) {
           const txResult = await rpcServer.getTransaction(hash);
@@ -210,6 +195,27 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           }
         }
         // <<
+      }
+
+      async function addTrustline(asset: string, kp: Keypair) {
+        let aliceAccount = await rpcServer.getAccount(kp.publicKey());
+        let code = asset.split(":")[0]
+        let issuer = asset.split(":")[1]
+
+        let aliceTrust = new TransactionBuilder(aliceAccount, {
+          fee: "1000",
+          timebounds: { minTime: 0, maxTime: 0 },
+          networkPassphrase: network,
+        })
+          .addOperation(
+            Operation.changeTrust({
+              asset: new Asset(code, issuer),
+            }),
+          )
+          .build();
+        aliceTrust.sign(kp);
+        await submitTransaction(aliceTrust);
+
         console.log("Trustline set for " + kp.publicKey());
       }
 
@@ -228,22 +234,44 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         return contract;
       }
 
-      let sac = await deploySAC();
-      let sac_wrapped = await deploySAC();
+      let sac = await deploySAC(regularSacIssuer);
+      console.log("Deployed SAC contract " + sac.contract);
+      let sac_wrapped = await deploySAC(wrappedIssuer);
+      console.log("Deployed SAC wrapped contract " + sac_wrapped.contract);
 
-      await addTrustline(sac.ticker, alice);
-      await addTrustline(sac.ticker, bob);
-      await addTrustline(sac_wrapped.ticker, alice);
-      await addTrustline(sac_wrapped.ticker, bob);
+      await addTrustline(sac.asset, alice);
+      await addTrustline(sac.asset, bob);
+      await addTrustline(sac_wrapped.asset, alice);
+      await addTrustline(sac_wrapped.asset, bob);
+
+      let issuerAccount = await rpcServer.getAccount(wrappedIssuer.publicKey());
+      let accFlags = new TransactionBuilder(issuerAccount, {
+        fee: "1000",
+        timebounds: { minTime: 0, maxTime: 0 },
+        networkPassphrase: network,
+      })
+          .addOperation(
+              Operation.setOptions({
+              setFlags: AuthRequiredFlag
+              }),
+          ).addOperation(
+              Operation.setOptions({
+                setFlags: AuthRevocableFlag
+              })
+          )
+          .build();
+      accFlags.sign(wrappedIssuer)
+      await submitTransaction(accFlags)
+      console.log("Updated asset flag accounts")
 
       let wrapper = await deploy_contract("enforced_classic_asset_wrapper");
       let controller = await deploy_contract("regulated_token_controller");
       let swap = await deploy_contract("swap");
 
       writeContext({
-        asset: sac.ticker + ":" + issuer.publicKey(),
+        asset: sac.asset,
         sac: sac.contract,
-        asset_wrapped: sac_wrapped.ticker + ":" + issuer.publicKey(),
+        asset_wrapped: sac_wrapped.asset,
         sac_wrapped: sac_wrapped.contract,
         wrapper: wrapper,
         controller: controller,
@@ -329,7 +357,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       }
 
       let tx = await wrappedFunctionClient!.initialize({
-        admin: issuer.publicKey(),
+        admin: wrappedIssuer.publicKey(),
         asset: testContext!.sac_wrapped,
         asset_controller: testContext!.controller,
       });
@@ -339,7 +367,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       await tx.simulate();
       await tx.sign({
-        signTransaction: signer(issuer).signTransaction,
+        signTransaction: signer(wrappedIssuer).signTransaction,
       });
 
       let result = await tx.send();
@@ -365,7 +393,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           testContext!.wrapper +
           " -- initialize " +
           " --admin " +
-          issuer.publicKey() +
+          wrappedIssuer.publicKey() +
           " --asset " +
           testContext!.sac_wrapped +
           " --asset_controller " +
@@ -467,8 +495,8 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log(mintTx.toXDR());
 
       await mintTx.signAuthEntries({
-        publicKey: issuer.publicKey(),
-        signAuthEntry: signer(issuer).signAuthEntry,
+        publicKey: regularSacIssuer.publicKey(),
+        signAuthEntry: signer(regularSacIssuer).signAuthEntry,
       });
       console.log(mintTx.needsNonInvokerSigningBy());
 
@@ -701,7 +729,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           from: alice.publicKey(),
           to: bob.publicKey(),
           token_from: testContext!.sac,
-          token_to: testContext!.sac_wrapped,
+          token_to: testContext!.wrapper,
           amount: BigInt(5),
         },
         { fee: 100000000 },
@@ -747,6 +775,15 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     });
   });
 });
+
+function makeTokenClient(contractId: string, key: Keypair) {
+  return new TokenClient({
+    publicKey: key.publicKey(),
+    networkPassphrase: network,
+    rpcUrl: rpcUrl,
+    contractId: contractId,
+  });
+}
 
 function signer(kp: Keypair) {
   return contract.basicNodeSigner(kp, network);

@@ -32,5 +32,11 @@ impl SwapTrait for SwapContract {
 
         token_from.transfer(&from, &to, &amount);
         token_to.transfer(&to, &from, &amount);
+
+        // token_from.transfer(&from, &contract_address, &amount);
+        // token_from.transfer(&contract_address, &to, &amount);
+        //
+        // token_to.transfer(&to, &contract_address, &amount);
+        // token_to.transfer(&contract_address, &from, &amount);
     }
 }
