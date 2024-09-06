@@ -33,6 +33,7 @@ impl SwapTrait for SwapContract {
         token_from.transfer(&from, &to, &amount);
         token_to.transfer(&to, &from, &amount);
 
+        // TODO: fails with .require_auth() is missing: why?
         // token_from.transfer(&from, &contract_address, &amount);
         // token_from.transfer(&contract_address, &to, &amount);
         //

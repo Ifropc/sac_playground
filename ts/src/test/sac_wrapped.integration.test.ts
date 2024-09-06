@@ -1,10 +1,13 @@
 import {
-  Asset, AuthRequiredFlag, AuthRevocableFlag,
+  Asset,
+  AuthRequiredFlag,
+  AuthRevocableFlag,
   contract,
   Horizon,
   Keypair,
   Operation,
-  rpc, Transaction,
+  rpc,
+  Transaction,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { afterAll, beforeAll, beforeEach, describe, it } from "@jest/globals";
@@ -21,7 +24,6 @@ import { TokenControllerClient } from "../bindings/controller";
 // @ts-ignore
 import { SwapClient } from "../bindings/swap";
 import BalanceLineAsset = Horizon.HorizonApi.BalanceLineAsset;
-import {AuthFlag} from "@stellar/stellar-base";
 
 export * as rpc from "@stellar/stellar-sdk/rpc";
 const util = require("node:util");
@@ -36,7 +38,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
   let command = "stellar";
   // GCOSDE5QHBD6XZNBI3JNVTCNYHVSFLXYCIOAHH72KXGRYPULEAOEBBV3
   let regularSacIssuer = Keypair.fromSecret(
-      "SC6WGHCO3HPRMD24JZDFBRE2FSF5AWNOF5SRZOCZPYIGU5VGQ33FOKJW",
+    "SC6WGHCO3HPRMD24JZDFBRE2FSF5AWNOF5SRZOCZPYIGU5VGQ33FOKJW",
   );
   // GDF7FZPAMPF2A3CUNJPNTR4KEDT2O4MZIDFWMS7HLICQURYP3VYH27PY
   let wrappedIssuer = Keypair.fromSecret(
@@ -97,7 +99,10 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     if (testContext?.sac) {
       sacTokenClient = makeTokenClient(testContext.sac, submitter);
       wrappedTokenClient = makeTokenClient(testContext.wrapper, submitter);
-      underlyingSACTokenClient = makeTokenClient(testContext.sac_wrapped, submitter);
+      underlyingSACTokenClient = makeTokenClient(
+        testContext.sac_wrapped,
+        submitter,
+      );
       wrappedFunctionClient = new WrappedClient({
         publicKey: wrappedIssuer.publicKey(),
         networkPassphrase: network,
@@ -199,8 +204,8 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       async function addTrustline(asset: string, kp: Keypair) {
         let aliceAccount = await rpcServer.getAccount(kp.publicKey());
-        let code = asset.split(":")[0]
-        let issuer = asset.split(":")[1]
+        let code = asset.split(":")[0];
+        let issuer = asset.split(":")[1];
 
         let aliceTrust = new TransactionBuilder(aliceAccount, {
           fee: "1000",
@@ -250,19 +255,20 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         timebounds: { minTime: 0, maxTime: 0 },
         networkPassphrase: network,
       })
-          .addOperation(
-              Operation.setOptions({
-              setFlags: AuthRequiredFlag
-              }),
-          ).addOperation(
-              Operation.setOptions({
-                setFlags: AuthRevocableFlag
-              })
-          )
-          .build();
-      accFlags.sign(wrappedIssuer)
-      await submitTransaction(accFlags)
-      console.log("Updated asset flag accounts")
+        .addOperation(
+          Operation.setOptions({
+            setFlags: AuthRequiredFlag,
+          }),
+        )
+        .addOperation(
+          Operation.setOptions({
+            setFlags: AuthRevocableFlag,
+          }),
+        )
+        .build();
+      accFlags.sign(wrappedIssuer);
+      await submitTransaction(accFlags);
+      console.log("Updated asset flag accounts");
 
       let wrapper = await deploy_contract("enforced_classic_asset_wrapper");
       let controller = await deploy_contract("regulated_token_controller");
@@ -609,11 +615,12 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
     });
 
     it("Can transfer Alice -> Bob", async () => {
-      let balanceTx = await wrappedTokenClient!.balance({
+      // Can use SAC directly for read operations
+      let balanceTx = await underlyingSACTokenClient!.balance({
         id: alice.publicKey(),
       });
       let balance = (await balanceTx.simulate()).result;
-      let balanceTxBob = await wrappedTokenClient!.balance({
+      let balanceTxBob = await underlyingSACTokenClient!.balance({
         id: bob.publicKey(),
       });
       let balanceBob = (await balanceTxBob.simulate()).result;
@@ -772,6 +779,25 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
 
       expect(newBalanceWrapped).toBe(balanceWrapped + BigInt(5));
       expect(newBalanceBobWrapped).toBe(balanceBobWrapped - BigInt(5));
+    });
+
+    it("Can't transfer Alice -> Bob directly", async () => {
+      let transferTx = await underlyingSACTokenClient!.transfer(
+        {
+          from: alice.publicKey(),
+          to: bob.publicKey(),
+          amount: BigInt(3),
+        },
+        { fee: 100000000 },
+      );
+      expect(transferTx.needsNonInvokerSigningBy().length).toBe(0);
+      await transferTx.simulate();
+      let sim = transferTx.simulation;
+      expect(sim).toBeDefined();
+      expect(rpc.Api.isSimulationError(sim!)).toBe(true);
+      // Not authorized to do write operations directly
+      // @ts-ignore
+      expect(sim.error).toContain("balance is deauthorized");
     });
   });
 });
