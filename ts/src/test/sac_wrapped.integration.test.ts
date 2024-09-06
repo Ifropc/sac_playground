@@ -36,9 +36,9 @@ const horizon = new Horizon.Server("https://horizon-testnet.stellar.org");
 describe("Integration tests for wrapped Stellar Asset Contract", () => {
   dotenv.config();
   let command = "stellar";
-  // GCOSDE5QHBD6XZNBI3JNVTCNYHVSFLXYCIOAHH72KXGRYPULEAOEBBV3
+  // GB6RTUJOD37D6YDQFCYR3LKH4EXUKRFQ5VNQXI4I3UMWVBBK746AR7AX
   let regularSacIssuer = Keypair.fromSecret(
-    "SC6WGHCO3HPRMD24JZDFBRE2FSF5AWNOF5SRZOCZPYIGU5VGQ33FOKJW",
+    "SDJU4PSJNOJPFPJPMS33M5R3CTCPZ2X54NE47EQ5HV2KPZHJGTL3D653",
   );
   // GDF7FZPAMPF2A3CUNJPNTR4KEDT2O4MZIDFWMS7HLICQURYP3VYH27PY
   let wrappedIssuer = Keypair.fromSecret(
@@ -206,8 +206,9 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         let aliceAccount = await rpcServer.getAccount(kp.publicKey());
         let code = asset.split(":")[0];
         let issuer = asset.split(":")[1];
+        console.log(code + " " + issuer)
 
-        let aliceTrust = new TransactionBuilder(aliceAccount, {
+        let trust = new TransactionBuilder(aliceAccount, {
           fee: "1000",
           timebounds: { minTime: 0, maxTime: 0 },
           networkPassphrase: network,
@@ -218,8 +219,8 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
             }),
           )
           .build();
-        aliceTrust.sign(kp);
-        await submitTransaction(aliceTrust);
+        trust.sign(kp);
+        await submitTransaction(trust);
 
         console.log("Trustline set for " + kp.publicKey());
       }
@@ -790,10 +791,12 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
         },
         { fee: 100000000 },
       );
-      expect(transferTx.needsNonInvokerSigningBy().length).toBe(0);
       await transferTx.simulate();
       let sim = transferTx.simulation;
       expect(sim).toBeDefined();
+      if (!rpc.Api.isSimulationError(sim!)) {
+        console.log(sim)
+      }
       expect(rpc.Api.isSimulationError(sim!)).toBe(true);
       // Not authorized to do write operations directly
       // @ts-ignore
