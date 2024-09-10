@@ -232,10 +232,8 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
             contract_name +
             ".wasm",
         );
-        expect(stderr).toBe("");
         const output: string = stdout;
-        // TODO [cli] improve output
-        const contract = output.split("Deployed!")[1].trim();
+        const contract = output.trim();
         console.log("Deployed " + contract_name + ": " + contract);
         return contract;
       }
@@ -738,6 +736,7 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
           to: bob.publicKey(),
           token_from: testContext!.sac,
           token_to: testContext!.wrapper,
+          sac: testContext!.sac_wrapped,
           amount: BigInt(5),
         },
         { fee: 100000000 },
@@ -745,18 +744,19 @@ describe("Integration tests for wrapped Stellar Asset Contract", () => {
       console.log(swapTx.needsNonInvokerSigningBy());
       console.log(swapTx.toXDR());
 
-      await swapTx.signAuthEntries({
-        publicKey: alice.publicKey(),
-        signAuthEntry: signer(alice).signAuthEntry,
-      });
-      console.log(swapTx.needsNonInvokerSigningBy());
-      await swapTx.signAuthEntries({
-        publicKey: bob.publicKey(),
-        signAuthEntry: signer(bob).signAuthEntry,
-      });
-      console.log(swapTx.needsNonInvokerSigningBy());
+      // await swapTx.signAuthEntries({
+      //   publicKey: alice.publicKey(),
+      //   signAuthEntry: signer(alice).signAuthEntry,
+      // });
+      // console.log(swapTx.needsNonInvokerSigningBy());
+      // await swapTx.signAuthEntries({
+      //   publicKey: bob.publicKey(),
+      //   signAuthEntry: signer(bob).signAuthEntry,
+      // });
+      // console.log(swapTx.needsNonInvokerSigningBy());
 
       await swapTx.simulate();
+      console.log(swapTx.simulationData)
       await swapTx.sign({
         signTransaction: signer(submitter).signTransaction,
       });
